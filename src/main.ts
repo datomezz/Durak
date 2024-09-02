@@ -6,7 +6,8 @@ export enum ElementEnum {
   TABLE_CARDS = 'TABLE_CARDS',
   PLAYER_DUMMY = 'PLAYER_DUMMY',
   PLAYER = 'PLAYER',
-  GAME = 'GAME'
+  GAME = 'GAME',
+  TRUMP = 'TRUMP'
 };
 
 export const HTML_SELECTOR_MAP = new Map();
@@ -20,7 +21,7 @@ HTML_SELECTOR_MAP
 
 
 export interface IUiEntityConstructor {
-  dummy: 1 | 2 | 3
+  totalPlayers: 2 | 3 | 4
 };
 
 class UIEntity {
@@ -29,7 +30,6 @@ class UIEntity {
 
   static crateElement = (type: ElementEnum, cardArgs: CardEntity | null = null) => {
     const $el = document.createElement('div');
-
 
     switch(type) {
       case ElementEnum.CARD:
@@ -71,6 +71,10 @@ class UIEntity {
       case ElementEnum.TABLE_CARDS:
         $el.className = 'table-cards';
         break;
+      case ElementEnum.TRUMP:
+        $el.className = 'trump';
+        // $el.innerText = ;
+        break;
       default:
         break;
     }
@@ -84,29 +88,26 @@ class UIEntity {
     const $table_cards = UIEntity.crateElement(ElementEnum.TABLE_CARDS);
     const $player = UIEntity.crateElement(ElementEnum.PLAYER);
 
-    // Dummy Players
-    for(let i = 0; i < $player_dummys.length; i++) {
+    for(let i = 0; i < players.length; i++) {
+      const player = players[i];
       const $player_dummy = $player_dummys[i];
       for(let x = 0; x < 6; x++) {
+        if(player.isHuman) {
+          $player.appendChild(UIEntity.crateElement(ElementEnum.CARD, player.myCards[x]));
+          $table_cards.appendChild(UIEntity.crateElement(ElementEnum.CARD));
+          continue;
+        }
+
         $player_dummy.appendChild(UIEntity.crateElement(ElementEnum.CARD_DUMMY, players[i].myCards[x]));
       }
 
       $game.appendChild($player_dummy);
+      $game.appendChild($player);
+      $game.appendChild($table_cards);
     }
-
-    // Player
-    for(let i = 0; i < 6; i++) {
-      $player.appendChild(UIEntity.crateElement(ElementEnum.CARD, players[players.length - 1].myCards[i]));
-      $table_cards.appendChild(UIEntity.crateElement(ElementEnum.CARD));
-    }
-
-    $game.appendChild($player);
-    $game.appendChild($table_cards);
 
     UIEntity.$ROOT?.appendChild($game);
   }
-
-  public DUMMY: 1 | 2 | 3 = 1;
 
   constructor() { }
 
@@ -184,24 +185,19 @@ export class PlayerEntity {
 
   private _isMyTurnToMove: boolean = false;
   private _isMyTurnToCounterMove: boolean = false;
+  private _isHuman: boolean = false;
 
-  get isMyTurnToMove() {
-    return this._isMyTurnToMove;
-  } 
+  get isHuman() { return this._isHuman; } 
+  get isMyTurnToMove() { return this._isMyTurnToMove; } 
+  get isMyTurnToCounterMove() { return this._isMyTurnToCounterMove; } 
 
-  set isMyTurnToMove(bool: boolean) {
-    this._isMyTurnToMove = bool;
-  }
-
-  get isMyTurnToCounterMove() {
-    return this._isMyTurnToCounterMove;
-  } 
-
-  set isMuTurnToCounterMove(bool: boolean) {
-    this._isMyTurnToCounterMove = bool;
-  }
+  set isMyTurnToMove(bool: boolean) { this._isMyTurnToMove = bool; }
+  set isMyTurnToCounterMove(bool: boolean) { this._isMyTurnToCounterMove = bool; }
+  set isHuman(bool: boolean) { this._isHuman = bool}
   
-  protected modifyCardsForMoving = () => {};
+  protected modifyCardsForMoving = () => {
+    
+  };
 
   public check = () => {};
   public move = (card: CardEntity) => {};
@@ -212,20 +208,26 @@ export class BoardEntity {
   static MOVE_COUNT = 0;
   public TRUMP: SuitsEnum | null = null;
   public UI: UIEntity | null = null
+  public TOTAL_PLAYERS: number = 2;
 
   constructor(args: IUiEntityConstructor) {
     this.TRUMP = SUITS[~~(Math.random() * SUITS.length)];
     this.UI = new UIEntity();
-    this.players = Array.from({length: args.dummy}, () => new PlayerEntity())
+    this.TOTAL_PLAYERS = args.totalPlayers;
+
+    this.players = Array.from({length: args.totalPlayers}, () => new PlayerEntity())
+    this.players[this.players.length - 1].isHuman = true;
   }
 
   public allCards: CardEntity[] = [];
   public dumpCards: CardEntity[] = [];
+  public tableCards: CardEntity[] = [];
+
   public players: PlayerEntity[] = [];
   public fillAllPlayersCards = () => {}
 	public defineWhoMoves = () => {}
 
-	private _firstMove: boolean = false;
+	private _firstMove: boolean = true;
 
   private _generateDeck = () => {
     const arr = [];
@@ -244,9 +246,6 @@ export class BoardEntity {
       const removedCards = this.allCards.splice(0, 6);
       this.players[i].setCards(removedCards);
     }
-
-    console.log('cards', this.allCards);
-    console.log('players', this.players);
   }
 
   private _shuffleDeck = (cards: CardEntity[]): CardEntity[] => {
@@ -260,15 +259,42 @@ export class BoardEntity {
     return cards;
   }
 
+  private _defineWhoMovesFirst = () => {
+    if(this._firstMove) {
+      const playersCards = [...this.players.flatMap(player => player.myCards)];
+      const trumpCards = playersCards.filter(card => card.isTrump).sort((a, b) => a.power - b.power);
+
+      if(!trumpCards.length) {
+        this.players[0].isMyTurnToMove = true;
+        this.players[1].isMyTurnToCounterMove = true;
+        return;
+      }
+
+      const playerWithLowerTrumpIdx = this.players.findIndex(player => player.myCards.includes(trumpCards[0]));
+      this.players[playerWithLowerTrumpIdx].isMyTurnToMove = true;
+      console.log('player', playerWithLowerTrumpIdx, this.TOTAL_PLAYERS);
+
+      if(playerWithLowerTrumpIdx == this.TOTAL_PLAYERS - 1 && !this.players?.[playerWithLowerTrumpIdx + 1]) {
+        this.players[0].isMyTurnToCounterMove = true;
+      } else {
+        this.players[playerWithLowerTrumpIdx + 1].isMyTurnToCounterMove = true;
+      }
+
+      this._firstMove = false;
+    }
+  }
+
   public init = () => {
     if(!this.UI) return;
     this._generateDeck();
     this.UI.generateDefaultPlayField(this.players);
+    this._defineWhoMovesFirst();
+    console.log('defined', this.players);
   }
 }
 
 function init() {
-  new BoardEntity({dummy: 3}).init();
+  new BoardEntity({totalPlayers: 4}).init();
 }
 
 init();

@@ -5,8 +5,9 @@
 }
 :root {
   font-size: 10px;
-  --cardWidth: 6rem;
+  --cardWidth: 6.5rem;
   --cardHeigth: 10rem;
+  --cardSpanPadding: .1rem;
 }
 
 :root > body {
@@ -17,9 +18,9 @@
   justify-content: center;
   display: grid;
   grid-template-areas: 
-  ". dummy-1 ."
+  "... dummy-1 ..."
   "dummy-3 table-cards dummy-2"
-  ". player ." ;
+  "... player ..." ;
   gap: 1rem;
   border: .1rem solid black;
   grid-template-rows: 
@@ -69,6 +70,7 @@
   height: var(--cardHeigth);
   border: 1px solid black;
   background-color: #fff;
+  padding: .5rem;
 
   position: relative;
   transition: .3s ease;
@@ -90,14 +92,14 @@
 
 .card > .card__label:first-child {
   position: absolute;
-  top: 0;
-  left: 0;
+  top: var(--cardSpanPadding);
+  left: var(--cardSpanPadding);
 }
 
 .card > .card__label:last-child {
   position: absolute;
-  bottom: 0;
-  right: 0;
+  bottom: var(--cardSpanPadding);
+  right: var(--cardSpanPadding);
   transform: rotate(180deg);
 }
 
