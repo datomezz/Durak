@@ -7,11 +7,13 @@ import { UIEntity } from './entities/ui.entity';
 // CREATE Events object, iterate throught this object, create listeners
 export enum EVENTS_ENUM {
   CLICK = 'CLICK',
+  SET_TABLE = 'SET_TABLE',
   TEST = 'TEST'
 }
 
 export const EVENTS = {
   [EVENTS_ENUM.CLICK]: [EVENTS_ENUM.CLICK],
+  [EVENTS_ENUM.SET_TABLE]: [EVENTS_ENUM.SET_TABLE],
   [EVENTS_ENUM.TEST]: [EVENTS_ENUM.TEST]
 }
 
@@ -52,16 +54,35 @@ export class BoardEntity {
     this.UI = new UIEntity();
     this.TOTAL_PLAYERS = args.totalPlayers;
 
-    this.players = Array.from({length: args.totalPlayers}, () => new PlayerEntity())
+    this._players = Array.from({length: args.totalPlayers}, () => new PlayerEntity());
     // DEFINE HUMAN, HUMAN IS ALWAYS LAST INDEX
-    this.players[this.players.length - 1].isHuman = true;
+    this._players[this.players.length - 1].isHuman = true;
   }
 
   public allCards: CardEntity[] = [];
   public dumpCards: CardEntity[] = [];
-  public tableCards: CardEntity[] = [];
 
-  public players: PlayerEntity[] = [];
+  private _table: CardEntity[][] = [];
+  get table() {
+    return this._table;
+  }
+  set table(table: CardEntity[][]) {
+    if(table.length <= 6) {
+      this._table = table;
+      EventEntity.dispatch(EVENTS_ENUM.SET_TABLE, table);
+    }
+  }
+
+
+  private _players: PlayerEntity[] = [];
+  get players() {
+    return this._players;
+  }
+
+  set players(players: PlayerEntity[]) {
+    this._players = players;
+  }
+  
 	private _firstMove: boolean = true;
 
   private _generateDeck = () => {
@@ -77,15 +98,22 @@ export class BoardEntity {
   }
 
   private _distributeCardsToPlayers = () => {
-    for(let i = 0; i < this.players.length + 1; i++) {
-      if(i === this.players.length) {
-        const removedCards = this.allCards.splice(0, 6);
-        this.tableCards = removedCards;
-      } else {
-        const removedCards = this.allCards.splice(0, 6);
-        this.players[i].setCards(removedCards);
-      }
+    for(let i = 0; i < this.players.length; i++) {
+      const removedCards = this.allCards.splice(0, 6);
+      this.players[i].setCards(removedCards);
     }
+  }
+
+  private _cardsToTableCards = (cards: CardEntity[]) => {
+    const result = [];
+    let chunkSize = 2;
+  
+    for (let i = 0; i < cards.length; i += chunkSize) {
+      const chunk = cards.slice(i, i + chunkSize);
+      result.push(chunk);
+    }
+    
+    return result;
   }
 
   private _shuffleDeck = (cards: CardEntity[]): CardEntity[] => {
@@ -130,7 +158,7 @@ export class BoardEntity {
     const player = this.players[playerIdx];
     const removeIdx = player.myCards.findIndex(card => card.id === +cardId);
     const remvoedCard = player.myCards.splice(removeIdx, 1);
-    this.tableCards = [...this.tableCards, ...remvoedCard];
+    this.table = this._cardsToTableCards([...this.table.flatMap(item => item), ...remvoedCard]);
     this.players[playerIdx] = player;
   }
 
@@ -149,8 +177,13 @@ export class BoardEntity {
 
     document.addEventListener(EVENTS_ENUM.CLICK, (e: any) => {
       const target = e.detail;
-      console.log('click', target.dataset.id);
       this._removeCardFromPlayer(target.dataset.id);
+    })
+
+    document.addEventListener(EVENTS_ENUM.SET_TABLE, (e: any) => {
+      const cards: CardEntity[][] = e.detail;
+      UIEntity.updateTable(cards);
+      console.log(EVENTS_ENUM.SET_TABLE, cards);
     })
 
     // document.querySelectorAll('.player-original').forEach($el => {
@@ -167,7 +200,6 @@ function init() {
 }
 
 init();
-
 /* 
   TASKS TO DO:
   1) rewrite render logic, put it into the border class

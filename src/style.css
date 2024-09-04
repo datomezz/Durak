@@ -19,7 +19,7 @@
   display: grid;
   grid-template-areas: 
   "... dummy-1 ..."
-  "dummy-3 table-cards dummy-2"
+  "dummy-3 table dummy-2"
   "... player ..." ;
   gap: 1rem;
   border: .1rem solid black;
@@ -51,12 +51,25 @@
   grid-area: player;
 }
 
-.table-cards {
-  grid-area: table-cards;
+.table {
+  grid-area: table;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: .5rem;
+  gap: 2rem;
+}
+
+.table__cards {
+  position: relative;
+  width: var(--cardWidth);
+  height: var(--cardHeigth);
+}
+
+.table__cards > .card:nth-child(2) {
+  position: absolute;
+  top: 1.5rem;
+  left: 1rem;
+  z-index: 2;
 }
 
 .cards {
@@ -75,6 +88,7 @@
   position: relative;
   transition: .3s ease;
   cursor: pointer;
+  z-index: 1;
 }
 
 .player-original > .card:hover {

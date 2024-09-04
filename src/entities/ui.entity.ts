@@ -1,28 +1,60 @@
-import { ElementEnum, SUITS_MAP } from "../index.constants";
+import { SUITS_MAP } from "../index.constants";
 import { EventEntity, EVENTS_ENUM } from "../main";
 import { CardEntity } from "./card.entity";
 import { PlayerEntity } from "./player.entity";
 
+export enum ELEMENT_ENUM {
+  CARD = 'CARD',
+  CARD_DUMMY = 'CARD_DUMMY',
+  TABLE = 'TABLE',
+  PLAYER_DUMMY = 'PLAYER_DUMMY',
+  PLAYER = 'PLAYER',
+  GAME = 'GAME',
+  TRUMP = 'TRUMP'
+};
+
+export const HTML_SELECTOR_MAP = new Map();
+HTML_SELECTOR_MAP
+  .set(ELEMENT_ENUM.CARD, '.card')
+  .set(ELEMENT_ENUM.CARD_DUMMY, '.card-dummy')
+  .set(ELEMENT_ENUM.TABLE, '.table')
+  .set(ELEMENT_ENUM.PLAYER_DUMMY, '.player-dummy')
+  .set(ELEMENT_ENUM.PLAYER, '.player-original')
+  .set(ELEMENT_ENUM.GAME, '.game')
+
 export class UIEntity {
   static $ROOT = document.querySelector<HTMLDivElement>('#app');
 
-  static crateElement = (type: ElementEnum) => {
+  static crateElement = (type: ELEMENT_ENUM) => {
     const $el = document.createElement('div');
 
     switch(type) {
-      case ElementEnum.GAME:
+      case ELEMENT_ENUM.GAME:
         $el.className = 'game';
-        break;
-      case ElementEnum.TABLE_CARDS:
-        $el.className = 'table-cards';
-        break;
-      case ElementEnum.TRUMP:
-        $el.className = 'trump';
         break;
       default:
         break;
     }
 
+    return $el;
+  }
+
+  static createTable = () => {
+    const $el = document.createElement('div');
+    $el.className = 'table';
+    const HTML = `
+      <div class="table__cards">
+      </div>
+    `;
+
+    $el.innerHTML = HTML.repeat(6);
+    return $el;
+  }
+
+  static createTableItem = (cards: CardEntity[]) => {
+    const $el = document.createElement('div');
+    $el.className = 'table__cards';
+    cards.map(card => $el.appendChild(UIEntity.createCard(card)));
     return $el;
   }
 
@@ -60,14 +92,24 @@ export class UIEntity {
     return $el;
   }
 
+  static updateTable = (table: CardEntity[][]) => {
+    const $table = document.querySelector(HTML_SELECTOR_MAP.get(ELEMENT_ENUM.TABLE));
+    if(!table) return;
+    console.log('table', $table);
+    $table.innerHTML = '';
+    table.forEach(cards => {
+      $table?.appendChild(UIEntity.createTableItem(cards));
+    })
+  }
+
   constructor() { }
 
   public $players: HTMLDivElement[] = [];
   public $table: HTMLDivElement | null = null;
 
   public generateDefaultPlayField = (players: PlayerEntity[]) => {
-    const $game = UIEntity.crateElement(ElementEnum.GAME);
-    const $table_cards = UIEntity.crateElement(ElementEnum.TABLE_CARDS);
+    const $game = UIEntity.crateElement(ELEMENT_ENUM.GAME);
+    const $table = UIEntity.createTable();
     const $player = UIEntity.createPlayer(players[players.length - 1]);
 
     const player_dummys = Array.from({length: players.length - 1}, (_, idx) => UIEntity.createPlayer(players[idx]));
@@ -84,14 +126,13 @@ export class UIEntity {
 
     for(let i = 0; i < 6; i++) {
       $player.appendChild(UIEntity.createCard(human.myCards[i]));
-      $table_cards.appendChild(UIEntity.createCard());
     }
 
     $game.appendChild($player);
-    $game.appendChild($table_cards);
+    $game.appendChild($table);
 
     this.$players = [...player_dummys, $player];
-    this.$table = $table_cards;
+    this.$table = $table;
 
     UIEntity.$ROOT?.appendChild($game);
   }

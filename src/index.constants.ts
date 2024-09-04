@@ -27,23 +27,3 @@ export const DECK_POWER_MAP = new Map([
 
 export const SUITS = Array.from(SUITS_MAP.keys());
 export const DECK_POWERS = Array.from(DECK_POWER_MAP.keys());
-
-export enum ElementEnum {
-  CARD = 'CARD',
-  CARD_DUMMY = 'CARD_DUMMY',
-  TABLE_CARDS = 'TABLE_CARDS',
-  PLAYER_DUMMY = 'PLAYER_DUMMY',
-  PLAYER = 'PLAYER',
-  GAME = 'GAME',
-  TRUMP = 'TRUMP'
-};
-
-export const HTML_SELECTOR_MAP = new Map();
-HTML_SELECTOR_MAP
-  .set(ElementEnum.CARD, 'card')
-  .set(ElementEnum.CARD_DUMMY, 'card-dummy')
-  .set(ElementEnum.TABLE_CARDS, 'table-cards')
-  .set(ElementEnum.PLAYER_DUMMY, 'player-dummy')
-  .set(ElementEnum.PLAYER, 'player-original')
-  .set(ElementEnum.GAME, 'game')
-
