@@ -1,14 +1,15 @@
-import { SUITS_MAP } from "../index.constants";
+import { ALLOWED_MOVEMENT_COUNT, SUITS_MAP } from "../index.constants";
 import { EventEntity, EVENTS_ENUM } from "../main";
 import { CardEntity } from "./card.entity";
 import { PlayerEntity } from "./player.entity";
 
 export enum ELEMENT_ENUM {
   CARD = 'CARD',
+  CARDS = 'CARDS',
   CARD_DUMMY = 'CARD_DUMMY',
   TABLE = 'TABLE',
   PLAYER_DUMMY = 'PLAYER_DUMMY',
-  PLAYER = 'PLAYER',
+  PLAYERS_CARDS = 'PLAYERS_CARDS',
   GAME = 'GAME',
   TRUMP = 'TRUMP'
 };
@@ -16,10 +17,11 @@ export enum ELEMENT_ENUM {
 export const HTML_SELECTOR_MAP = new Map();
 HTML_SELECTOR_MAP
   .set(ELEMENT_ENUM.CARD, '.card')
+  .set(ELEMENT_ENUM.CARDS, '.cards')
   .set(ELEMENT_ENUM.CARD_DUMMY, '.card-dummy')
   .set(ELEMENT_ENUM.TABLE, '.table')
   .set(ELEMENT_ENUM.PLAYER_DUMMY, '.player-dummy')
-  .set(ELEMENT_ENUM.PLAYER, '.player-original')
+  .set(ELEMENT_ENUM.PLAYERS_CARDS, '.cards')
   .set(ELEMENT_ENUM.GAME, '.game')
 
 export class UIEntity {
@@ -47,7 +49,7 @@ export class UIEntity {
       </div>
     `;
 
-    $el.innerHTML = HTML.repeat(6);
+    $el.innerHTML = HTML.repeat(ALLOWED_MOVEMENT_COUNT);
     return $el;
   }
 
@@ -77,13 +79,14 @@ export class UIEntity {
     
     for(let [key, value] of Object.entries(card)) {
       $el.dataset[key] = value;
-      $el.innerHTML = `
-        <span class="card__label">${card.label}</span>
-        <span class="card__suit">${SUITS_MAP.get(card.suit as any)}</span>
-        <span class="card__label">${card.label}</span>
-      `;
-      $el.classList.add(card.suit ?? '');
     }
+
+    $el.innerHTML = `
+      <span class="card__label">${card.label}</span>
+      <span class="card__suit">${SUITS_MAP.get(card.suit as any)}</span>
+      <span class="card__label">${card.label}</span>
+    `;
+    $el.classList.add(card.suit ?? '');
 
     $el.addEventListener('click', (e: any) => {
       EventEntity.dispatch(EVENTS_ENUM.CLICK, e.currentTarget);
@@ -95,11 +98,24 @@ export class UIEntity {
   static updateTable = (table: CardEntity[][]) => {
     const $table = document.querySelector(HTML_SELECTOR_MAP.get(ELEMENT_ENUM.TABLE));
     if(!table) return;
-    console.log('table', $table);
     $table.innerHTML = '';
     table.forEach(cards => {
       $table?.appendChild(UIEntity.createTableItem(cards));
     })
+  }
+
+  static updatePlayer = (player: PlayerEntity) => {
+    const selector = HTML_SELECTOR_MAP.get(ELEMENT_ENUM.PLAYERS_CARDS) + `[data-id="${player.id}"]`;
+    const $player = document.querySelector(selector);
+    if(!$player) return;
+    $player.innerHTML = '';
+    player.myCards.forEach(card => $player?.appendChild(UIEntity.createCard(card)));
+  }
+
+  static removeCard = (cardId: string) => {
+    const $cards = document.querySelectorAll(HTML_SELECTOR_MAP.get(ELEMENT_ENUM.CARD));
+    const $card = Array.from($cards).find(item => item.dataset.id === `${cardId}`);
+    $card?.remove();
   }
 
   constructor() { }
@@ -117,14 +133,14 @@ export class UIEntity {
 
     for(let i = 0; i < player_dummys.length; i++) {
       const $player_dummy = player_dummys[i];
-      for(let x = 0; x < 6; x++) {
+      for(let x = 0; x < ALLOWED_MOVEMENT_COUNT; x++) {
         $player_dummy.appendChild(UIEntity.createCard(players[i].myCards[x]));
       }
 
       $game.appendChild($player_dummy);
     }
 
-    for(let i = 0; i < 6; i++) {
+    for(let i = 0; i < ALLOWED_MOVEMENT_COUNT; i++) {
       $player.appendChild(UIEntity.createCard(human.myCards[i]));
     }
 

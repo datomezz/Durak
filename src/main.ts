@@ -1,5 +1,5 @@
 import { CardEntity } from './entities/card.entity';
-import { DECK_POWERS, SUITS, SuitsEnum } from './index.constants';
+import { ALLOWED_MOVEMENT_COUNT, DECK_POWERS, SUITS, SUITS_MAP, SuitsEnum } from './index.constants';
 import { PlayerEntity } from './entities/player.entity';
 import './style.css'
 import { UIEntity } from './entities/ui.entity';
@@ -45,6 +45,8 @@ export interface IBoardEntityConstructor {
 
 export class BoardEntity {
   static MOVE_COUNT = 0;
+  static IS_MOVEMENT_ALLOWED: boolean = true;
+
   public TRUMP: SuitsEnum | null = null;
   public UI: UIEntity | null = null
   public TOTAL_PLAYERS: number = 2;
@@ -67,12 +69,15 @@ export class BoardEntity {
     return this._table;
   }
   set table(table: CardEntity[][]) {
-    if(table.length <= 6) {
+    if(table.length <= ALLOWED_MOVEMENT_COUNT) {
       this._table = table;
       EventEntity.dispatch(EVENTS_ENUM.SET_TABLE, table);
+
+      if(table.flatMap(item => item).length === ALLOWED_MOVEMENT_COUNT * 2) {
+        BoardEntity.IS_MOVEMENT_ALLOWED = false;
+      }
     }
   }
-
 
   private _players: PlayerEntity[] = [];
   get players() {
@@ -99,7 +104,7 @@ export class BoardEntity {
 
   private _distributeCardsToPlayers = () => {
     for(let i = 0; i < this.players.length; i++) {
-      const removedCards = this.allCards.splice(0, 6);
+      const removedCards = this.allCards.splice(0, ALLOWED_MOVEMENT_COUNT);
       this.players[i].setCards(removedCards);
     }
   }
@@ -134,14 +139,14 @@ export class BoardEntity {
 
       if(!trumpCards.length) {
         this.players[0].isMyTurnToMove = true;
-        this.players[0].modifyCardsForMoving();
+        this.players[0].modifyCardsForMoving(this.table);
         this.players[1].isMyTurnToCounterMove = true;
         return;
       }
 
       const playerWithLowerTrumpIdx = this.players.findIndex(player => player.myCards.includes(trumpCards[0]));
       this.players[playerWithLowerTrumpIdx].isMyTurnToMove = true;
-      this.players[playerWithLowerTrumpIdx].modifyCardsForMoving();
+      this.players[playerWithLowerTrumpIdx].modifyCardsForMoving(this.table);
 
       if(playerWithLowerTrumpIdx == this.TOTAL_PLAYERS - 1 && !this.players?.[playerWithLowerTrumpIdx + 1]) {
         this.players[0].isMyTurnToCounterMove = true;
@@ -154,31 +159,65 @@ export class BoardEntity {
   }
 
   private _removeCardFromPlayer = (cardId: string) => {
-    const playerIdx = this._findPlayerIdxById(cardId);
+    const playerIdx = this._findPlayerIdxByCardId(cardId);
     const player = this.players[playerIdx];
     const removeIdx = player.myCards.findIndex(card => card.id === +cardId);
     const remvoedCard = player.myCards.splice(removeIdx, 1);
     this.table = this._cardsToTableCards([...this.table.flatMap(item => item), ...remvoedCard]);
     this.players[playerIdx] = player;
+
+    UIEntity.removeCard(cardId);
   }
 
-  private _findPlayerIdxById = (cardId: string): number => {
+  private _findPlayerIdxByCardId = (cardId: string): number => {
     const card = this.players.flatMap(player => player.myCards).find(card => card.id == +cardId);
     if(!card) return -1;
 
     return this.players.findIndex(player => player.myCards.includes(card));
   }
 
+  public updatePlayersCardsForMoving = () => {
+    this.players.forEach(item => item.modifyCardsForMoving(this.table));
+  }
+
+  public updatePlayer = (player: PlayerEntity) => {
+    
+  }
+
+  private _isPlayerAllowedToMove = (cardId: string) => {
+    const playerIdx = this._findPlayerIdxByCardId(cardId);
+    if(playerIdx == -1) return;
+    const tableLength = this.table.flatMap(i => i).length;
+    const firstTurn = this.players[playerIdx].isMyTurnToMove;
+    const secondTurn = this.players[playerIdx].isMyTurnToCounterMove;
+    return ((tableLength % 2 == 0) && (firstTurn && !secondTurn)) ||
+      ((tableLength % 2 == 1) && (secondTurn && !firstTurn));
+  }
+
+  private _renderTrump = () => {
+    const $trump = document.querySelector('#trump');
+    if($trump && this.TRUMP) {
+      $trump.innerHTML = 'Trump ' + SUITS_MAP.get(this.TRUMP);
+    }
+  }
+
   public init = () => {
     if(!this.UI) return;
     this._generateDeck();
     this.UI.generateDefaultPlayField(this.players);
+    this._renderTrump();
     this._defineWhoMovesFirst();
+    console.log('players', this.players);
 
     document.addEventListener(EVENTS_ENUM.CLICK, (e: any) => {
-      const target = e.detail;
-      this._removeCardFromPlayer(target.dataset.id);
-    })
+      if(BoardEntity.IS_MOVEMENT_ALLOWED) {
+        const target = e.detail;
+        const isAllowed = this._isPlayerAllowedToMove(target.dataset.id);
+        if(!isAllowed) return;
+        this._removeCardFromPlayer(target.dataset.id);
+        this.updatePlayersCardsForMoving();
+      }
+    });
 
     document.addEventListener(EVENTS_ENUM.SET_TABLE, (e: any) => {
       const cards: CardEntity[][] = e.detail;
@@ -186,12 +225,6 @@ export class BoardEntity {
       console.log(EVENTS_ENUM.SET_TABLE, cards);
     })
 
-    // document.querySelectorAll('.player-original').forEach($el => {
-    //   $el.addEventListener('click', (e: any) => {
-    //     this.players[this.players.length -1].modifyCardsForMoving(this.tableCards);
-    //     console.log('click', this.tableCards, this.players[3].myCards);
-    //   })
-    // })
   }
 }
 

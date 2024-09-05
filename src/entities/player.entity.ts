@@ -1,4 +1,5 @@
 import { CardEntity } from "./card.entity";
+import { UIEntity } from "./ui.entity";
 
 export class PlayerEntity {
   static PLAYER_COUNT = 1;
@@ -26,19 +27,34 @@ export class PlayerEntity {
   set isMyTurnToCounterMove(bool: boolean) { this._isMyTurnToCounterMove = bool; }
   set isHuman(bool: boolean) { this._isHuman = bool}
   
-  public modifyCardsForMoving = (tableCards: CardEntity[] = []) => {
+  public modifyCardsForMoving = (tableCards: CardEntity[][]) => {
+    const table = tableCards.flatMap(i => i);
+    this.myCards.forEach(card => card.isAllowToMove = false);
     if(!tableCards.length) {
       this.myCards.forEach(card => card.isAllowToMove = true);
     }
 
-    const powers = tableCards.map(card => card.power);
+    const powers = table.map(card => card.power);
     const powerUniqueArr = Array.from(new Set(powers));
 
-    this.myCards.forEach(card => {
-      if(powerUniqueArr.includes(card.power)) {
-        card.isAllowToMove = true;
-      }
-    });
+    if(this.isMyTurnToMove) {
+      this.myCards.forEach(card => {
+        if(powerUniqueArr.includes(card.power)) {
+          card.isAllowToMove = true;
+        }
+      });
+    }
+
+    if(this.isMyTurnToCounterMove) {
+      const lastCard = table[table.length - 1];
+      this.myCards.forEach(card => {
+        if(lastCard.suit === card.suit && lastCard.power < card.power) {
+          card.isAllowToMove = true;
+        }
+      })
+    }
+
+    UIEntity.updatePlayer(this);
   }
 
   public check = () => {};
