@@ -176,8 +176,32 @@ export class BoardEntity {
     return this.players.findIndex(player => player.myCards.includes(card));
   }
 
+  private _findPlayerIdxWhoMoves = () => {
+    return this.players.findIndex(player => player.isMyTurnToMove);
+  }
+
+  private _findPlayerIdxWhoCounterMoves = () => {
+    return this.players.findIndex(player => player.isMyTurnToCounterMove);
+  }
+
   public updatePlayersCardsForMoving = () => {
     this.players.forEach(item => item.modifyCardsForMoving(this.table));
+  }
+
+  public checkAction = () => {
+    const lastMovingPlayer = this._findPlayerIdxWhoMoves();
+    const counterMovePlayerIdx = this._findPlayerIdxWhoCounterMoves();
+    const proxyPlayers = [...this.players];
+    proxyPlayers.splice(counterMovePlayerIdx, 1);
+    const currentPlayerIdx = proxyPlayers.findIndex(player => player.isMyTurnToMove);
+    const nextProxyPlayerIdx = currentPlayerIdx + 1 >= proxyPlayers.length ? 0 : currentPlayerIdx + 1;
+
+    const newMovingPlayerId = proxyPlayers[nextProxyPlayerIdx].id;
+    const nextPlayerIdx = this.players.findIndex(player => player.id == newMovingPlayerId);
+    if(nextPlayerIdx !== -1) {
+      this.players[lastMovingPlayer].isMyTurnToMove = false;
+      this.players[nextPlayerIdx].isMyTurnToMove = true;
+    }
   }
 
   public updatePlayer = (player: PlayerEntity) => {
@@ -207,7 +231,9 @@ export class BoardEntity {
     this.UI.generateDefaultPlayField(this.players);
     this._renderTrump();
     this._defineWhoMovesFirst();
-    console.log('players', this.players);
+    setTimeout(() => {
+      console.log('players', this.players);
+    }, 3000)
 
     document.addEventListener(EVENTS_ENUM.CLICK, (e: any) => {
       if(BoardEntity.IS_MOVEMENT_ALLOWED) {
@@ -223,7 +249,12 @@ export class BoardEntity {
       const cards: CardEntity[][] = e.detail;
       UIEntity.updateTable(cards);
       console.log(EVENTS_ENUM.SET_TABLE, cards);
-    })
+    });
+
+    document.querySelector('#check')?.addEventListener('click', () => {
+      this.checkAction();
+      console.log('players', this.players);
+    });
 
   }
 }

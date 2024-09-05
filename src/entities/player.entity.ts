@@ -48,7 +48,10 @@ export class PlayerEntity {
     if(this.isMyTurnToCounterMove) {
       const lastCard = table[table.length - 1];
       this.myCards.forEach(card => {
-        if(lastCard.suit === card.suit && lastCard.power < card.power) {
+        if(
+          (lastCard.suit === card.suit && lastCard.power < card.power) ||
+          (card.isTrump && card.power > lastCard.power)
+        ) {
           card.isAllowToMove = true;
         }
       })
