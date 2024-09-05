@@ -59,8 +59,7 @@ export class PlayerEntity {
 
     UIEntity.updatePlayer(this);
   }
-
   public check = () => {};
-  public move = (card: CardEntity) => {};
+  public move = (table: CardEntity[][]) => {};
   public take = (cards: CardEntity[]) => {};
 }

@@ -201,6 +201,7 @@ export class BoardEntity {
     if(nextPlayerIdx !== -1) {
       this.players[lastMovingPlayer].isMyTurnToMove = false;
       this.players[nextPlayerIdx].isMyTurnToMove = true;
+      this.updatePlayersCardsForMoving();
     }
   }
 
@@ -231,15 +232,18 @@ export class BoardEntity {
     this.UI.generateDefaultPlayField(this.players);
     this._renderTrump();
     this._defineWhoMovesFirst();
-    setTimeout(() => {
-      console.log('players', this.players);
-    }, 3000)
+    console.table(this.players.flatMap(p => p.myCards));
 
     document.addEventListener(EVENTS_ENUM.CLICK, (e: any) => {
       if(BoardEntity.IS_MOVEMENT_ALLOWED) {
         const target = e.detail;
+        const playerIdx = this._findPlayerIdxByCardId(target.dataset.id);
+        this.players[playerIdx].move(this.table);
         const isAllowed = this._isPlayerAllowedToMove(target.dataset.id);
+
         if(!isAllowed) return;
+        if(!(target.dataset.isAllowToMove === 'true')) return;
+
         this._removeCardFromPlayer(target.dataset.id);
         this.updatePlayersCardsForMoving();
       }
@@ -259,14 +263,4 @@ export class BoardEntity {
   }
 }
 
-function init() {
-  new BoardEntity({totalPlayers: 4}).init();
-}
-
-init();
-/* 
-  TASKS TO DO:
-  1) rewrite render logic, put it into the border class
-  2) write update logic on state change while events
-  3) Write Event loop and add different events
-*/
+new BoardEntity({totalPlayers: 4}).init();
