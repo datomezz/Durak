@@ -1,4 +1,5 @@
 import { CardEntity } from "./card.entity";
+import { EventEntity, EVENTS_ENUM } from "./events.entity";
 import { UIEntity } from "./ui.entity";
 
 export class PlayerEntity {
@@ -10,9 +11,15 @@ export class PlayerEntity {
 
   public id = 0;
   public myCards: CardEntity[] = [];
+  public hasTaken: boolean = false;
+  public hasFinished: boolean = false;
 
   public setCards = (cards: CardEntity[]) => {
     this.myCards = cards;
+  }
+
+  public setCard = (card: CardEntity) => {
+    this.myCards = [...this.myCards, card];
   }
 
   private _isMyTurnToMove: boolean = false;
@@ -23,15 +30,24 @@ export class PlayerEntity {
   get isMyTurnToMove() { return this._isMyTurnToMove; } 
   get isMyTurnToCounterMove() { return this._isMyTurnToCounterMove; } 
 
-  set isMyTurnToMove(bool: boolean) { this._isMyTurnToMove = bool; }
+  set isMyTurnToMove(bool: boolean) { 
+    this._isMyTurnToMove = bool; 
+  }
   set isMyTurnToCounterMove(bool: boolean) { this._isMyTurnToCounterMove = bool; }
   set isHuman(bool: boolean) { this._isHuman = bool}
   
   public modifyCardsForMoving = (tableCards: CardEntity[][]) => {
     const table = tableCards.flatMap(i => i);
     this.myCards.forEach(card => card.isAllowToMove = false);
+
     if(!tableCards.length) {
-      this.myCards.forEach(card => card.isAllowToMove = true);
+
+      if(this.isMyTurnToMove) {
+        this.myCards.forEach(card => card.isAllowToMove = true);
+        UIEntity.updatePlayer(this);
+      }
+
+      return;
     }
 
     const powers = table.map(card => card.power);
@@ -50,7 +66,8 @@ export class PlayerEntity {
       this.myCards.forEach(card => {
         if(
           (lastCard.suit === card.suit && lastCard.power < card.power) ||
-          (card.isTrump && card.power > lastCard.power)
+          (card.isTrump && !lastCard.isTrump) || 
+          ((card.isTrump && lastCard.isTrump) && card.power > lastCard.power)
         ) {
           card.isAllowToMove = true;
         }
@@ -59,7 +76,21 @@ export class PlayerEntity {
 
     UIEntity.updatePlayer(this);
   }
-  public check = () => {};
-  public move = (table: CardEntity[][]) => {};
-  public take = (cards: CardEntity[]) => {};
+
+  public check = () => { };
+
+  public move = (target: HTMLDivElement) => {
+    const targetId = target.dataset.id as any;
+    const removeIdx = this.myCards.findIndex(card => card.id === +targetId);
+    const removedCard = this.myCards.splice(removeIdx, 1);
+    UIEntity.removeCard(targetId);
+    EventEntity.dispatch(EVENTS_ENUM.REMOVE_CARD_FROM_PLAYER, removedCard);
+  };
+
+  public take = (table: CardEntity[][]) => {
+    const cards = table.flatMap(i => i);
+    this.setCards([...this.myCards, ...cards]);
+    this.hasTaken = true;
+    UIEntity.updatePlayer(this);
+  };
 }

@@ -1,6 +1,6 @@
 import { ALLOWED_MOVEMENT_COUNT, SUITS_MAP } from "../index.constants";
-import { EventEntity, EVENTS_ENUM } from "../main";
 import { CardEntity } from "./card.entity";
+import { EventEntity, EVENTS_ENUM } from "./events.entity";
 import { PlayerEntity } from "./player.entity";
 
 export enum ELEMENT_ENUM {
@@ -122,6 +122,39 @@ export class UIEntity {
 
   public $players: HTMLDivElement[] = [];
   public $table: HTMLDivElement | null = null;
+
+  public generateDefaultPlayFieldDebug = (players: PlayerEntity[], table: CardEntity[][]) => {
+    const $game = UIEntity.crateElement(ELEMENT_ENUM.GAME);
+    const $table = UIEntity.createTable();
+    const $player = UIEntity.createPlayer(players[players.length - 1]);
+
+    const player_dummys = players.filter(p => !p.isHuman).map((player) => UIEntity.createPlayer(player));
+    const human = players.find(p => p.isHuman);
+
+    for(let i = 0; i < player_dummys.length; i++) {
+      const $player_dummy = player_dummys[i];
+      for(let x = 0; x < players[i].myCards.length; x++) {
+        $player_dummy.appendChild(UIEntity.createCard(players[i].myCards[x]));
+      }
+
+      $game.appendChild($player_dummy);
+    }
+
+    if(human && human.myCards.length) {
+      for(let i = 0; i < human.myCards.length; i++) {
+        $player.appendChild(UIEntity.createCard(human.myCards[i]));
+      }
+      $game.appendChild($player);
+    }
+
+    $game.appendChild($table);
+
+    this.$players = [...player_dummys, $player];
+    this.$table = $table;
+
+    UIEntity.$ROOT?.appendChild($game);
+    UIEntity.updateTable(table);
+  }
 
   public generateDefaultPlayField = (players: PlayerEntity[]) => {
     const $game = UIEntity.crateElement(ELEMENT_ENUM.GAME);
