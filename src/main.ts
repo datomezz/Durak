@@ -29,6 +29,10 @@ export class BoardEntity {
   public UI: UIEntity | null = null
   public TOTAL_PLAYERS: number = StateEntity.TOTAL_PLAYERS;
 
+  private _isPlayerTaking: boolean = false;
+  private _playerCheckingCount: number = 0;
+  private _IDS: number[] = [];
+
   constructor(args: IBoardEntityConstructor) {
     this.UI = new UIEntity();
     this._debug = args.debug ?? this._debug;
@@ -42,6 +46,7 @@ export class BoardEntity {
       this.players = Array.from({length: args.totalPlayers}, () => new PlayerEntity());
       // DEFINE HUMAN, HUMAN IS ALWAYS LAST INDEX
       this.players[this.players.length - 1].isHuman = true;
+      this._IDS = this.players.map(p => p.id);
     }
 
     if(this._debug) {
@@ -92,8 +97,8 @@ export class BoardEntity {
 
   private _generateDeck = () => {
     const arr = [];
-    for(let x = 0; x < 2; x++) {
-    // for(let x = 0; x < SUITS.length; x++) {
+    // for(let x = 0; x < 3; x++) {
+    for(let x = 0; x < SUITS.length; x++) {
       for(let i = 0; i < DECK_POWERS.length; i++) {
         arr.push(new CardEntity({isTrump: SUITS[x] === this.TRUMP, power: DECK_POWERS[i], suit: SUITS[x]}));
       }
@@ -110,16 +115,24 @@ export class BoardEntity {
     }
   }
 
-  private _cardsToTableCards = (cards: CardEntity[]) => {
+  private _cardsToTableCards = (removedCard: CardEntity[]): void => {
+    if(this._isPlayerTaking) {
+      const proxyTable = this.table;
+      proxyTable.push(removedCard);
+      this.table = proxyTable;
+      return;
+    }
+
     const result = [];
     let chunkSize = 2;
+    let cards: CardEntity[] = [...this.table.flatMap(c => c), ...removedCard];
   
     for (let i = 0; i < cards.length; i += chunkSize) {
       const chunk = cards.slice(i, i + chunkSize);
       result.push(chunk);
     }
     
-    return result;
+    this.table = result;
   }
 
   private _shuffleDeck = (cards: CardEntity[]): CardEntity[] => {
@@ -170,18 +183,42 @@ export class BoardEntity {
     let idx = this.players.findIndex(player => player.isMyTurnToMove);
     if(idx === -1 && this.players.length <= 1) return idx;
     return idx === -1 ? 0 : idx;
-    // Zero is static, it could be another index
+  }
+
+  private _findNextId = (id: number): number => {
+    const existingIDs = this.players.map(p => p.id);
+    let IDS = [...this._IDS];
+
+    let nextId = null;
+    while(nextId === null) {
+      const idx = this._IDS.findIndex(n => n === id);
+      const nextIdx = (idx + 1) % IDS.length;
+      const target = existingIDs.find(i => i === IDS[nextIdx]);
+
+      if(target) nextId = target;
+      
+      if(!target) {
+        IDS = IDS.filter(i => i !== IDS[nextIdx]);
+        if(!IDS.length) nextId = -1;
+      }
+    }
+
+    return nextId;
   }
 
   private _findPlayerIdxWhoCounterMoves = (): number => {
     let idx = this.players.findIndex(player => player.isMyTurnToCounterMove);
+    if(idx !== -1) return idx;
     if(idx === -1 && this.players.length <= 1) return idx;
-    return idx === -1 ? 1 : idx;
-    // One is static, it could be another index
+
+    const nextId = this._findNextId(StateEntity.LAST_COUNTER_MOVE_PLAYER?.id as number);
+    if(nextId === -1) return -1;
+
+    return this.players.findIndex(p => p.id === nextId);
   }
 
   private _findNextIndex = (currentIdx: number) => {
-    return currentIdx + 1 == this.players.length ? 0 : currentIdx + 1;
+    return (currentIdx + 1) % this.players.length;
   }
 
   public updatePlayersCardsForMoving = () => {
@@ -189,12 +226,21 @@ export class BoardEntity {
   }
 
   public checkAction = () => {
+    if(this._isPlayerTaking) {
+      if(this._playerCheckingCount === this.players.length - 2) {
+        EventEntity.dispatch(EVENTS_ENUM.PLAYER_TOOK, null);
+        this._isPlayerTaking = false;
+        this._playerCheckingCount = 0;
+        return;
+      }
+    }
+
     const lastMovingPlayer = this._findPlayerIdxWhoMoves();
     const counterMovePlayerIdx = this._findPlayerIdxWhoCounterMoves();
     const proxyPlayers = [...this.players];
     proxyPlayers.splice(counterMovePlayerIdx, 1);
     const currentPlayerIdx = proxyPlayers.findIndex(player => player.isMyTurnToMove);
-    const nextProxyPlayerIdx = currentPlayerIdx + 1 >= proxyPlayers.length ? 0 : currentPlayerIdx + 1;
+    const nextProxyPlayerIdx = (currentPlayerIdx + 1) % proxyPlayers.length;
 
     const newMovingPlayerId = proxyPlayers[nextProxyPlayerIdx].id;
     const nextPlayerIdx = this.players.findIndex(player => player.id == newMovingPlayerId);
@@ -202,6 +248,8 @@ export class BoardEntity {
       this.players[lastMovingPlayer].isMyTurnToMove = false;
       this.players[nextPlayerIdx].isMyTurnToMove = true;
       this.updatePlayersCardsForMoving();
+
+      if(this._isPlayerTaking) this._playerCheckingCount++;
     }
   }
 
@@ -219,6 +267,16 @@ export class BoardEntity {
     const tableLength = this.table.flatMap(i => i).length;
     const firstTurn = this.players[playerIdx].isMyTurnToMove;
     const secondTurn = this.players[playerIdx].isMyTurnToCounterMove;
+    if(this._isPlayerTaking) {
+      const counterIdx = this._findPlayerIdxWhoCounterMoves();
+      if(this.players[counterIdx].myCards.length <= this.table.length) return false;
+      if(this.table.length === ALLOWED_MOVEMENT_COUNT) return false;
+      if(secondTurn) return false;
+      if(!firstTurn) return false;
+
+      return true;
+    }
+
     return ((tableLength % 2 == 0) && (firstTurn && !secondTurn)) ||
       ((tableLength % 2 == 1) && (secondTurn && !firstTurn));
   }
@@ -226,7 +284,7 @@ export class BoardEntity {
   private _renderTrump = () => {
     const $trump = document.querySelector('#trump');
     if($trump && this.TRUMP) {
-      $trump.innerHTML = 'Trump ' + SUITS_MAP.get(this.TRUMP);
+      $trump.innerHTML = `<span class="${this.TRUMP}">${SUITS_MAP.get(this.TRUMP)}</span>`;
     }
   }
 
@@ -294,6 +352,7 @@ export class BoardEntity {
 
     console.table(this.players);
     EventEntity.dispatch(EVENTS_ENUM.GAME_UPDATED, null);
+    StateEntity.IS_MOVEMENT_ALLOWED = !this.table.length;
   }
 
   public finishGame = () => {
@@ -304,11 +363,6 @@ export class BoardEntity {
 
     alert(`Player NO - ${this.players[0].id} Has Lost`);
     console.table(this.players);
-  }
-
-  public takeLoop = () => {
-    const idx = this._findPlayerIdxWhoCounterMoves()
-
   }
 
   private _loopAction = (action: string) => {
@@ -348,7 +402,7 @@ export class BoardEntity {
     });
 
     document.addEventListener(EVENTS_ENUM.CLICK, (e: any) => {
-      console.log('zd');
+      console.table(this.players);
       if(StateEntity.IS_MOVEMENT_ALLOWED) {
         const target = e.detail;
         const playerIdx = this._findPlayerIdxByCardId(target.dataset.id);
@@ -373,11 +427,19 @@ export class BoardEntity {
 
     document.addEventListener(EVENTS_ENUM.REMOVE_CARD_FROM_PLAYER, (e: any) => {
       const removedCard = e.detail;
-      this.table = this._cardsToTableCards([...this.table.flatMap(item => item), ...removedCard]);
+      this._cardsToTableCards(removedCard);
     });
 
     document.addEventListener(EVENTS_ENUM.GAME_UPDATED, (e: any) => {
       this.players.forEach(p => p.hasTaken = false);
+    });
+
+    document.addEventListener(EVENTS_ENUM.PLAYER_TOOK, (e: any) => {
+      const idx = this._findPlayerIdxWhoCounterMoves();
+      this.players[idx].take(this.table);
+      this.table = [];
+      UIEntity.updateTable(this.table);
+      this._updateGame();
     });
 
     // BUTTON LISTENERS
@@ -394,23 +456,19 @@ export class BoardEntity {
     });
 
     document.querySelector('#take')?.addEventListener('click', () => {
-      const idx = this._findPlayerIdxWhoCounterMoves();
-      console.log(this.players[idx]);
-      this.players[idx].take(this.table);
-      this.table = [];
-      UIEntity.updateTable(this.table);
-      this._updateGame();
+      this._isPlayerTaking = true;
     });
 
   }
+
 }
 
-new BoardEntity({
-  totalPlayers: 3, 
-  // debug: true, 
-  // debugSave: false
-  debug: false,
-  debugSave: true
-}).init();
+const DEBUG = false;
+const TOTAL_PLAYERS = 4;
+DEBUG ? 
+  new BoardEntity({ totalPlayers: TOTAL_PLAYERS, debug: true, debugSave: false }).init() 
+  :
+  new BoardEntity({ totalPlayers: TOTAL_PLAYERS, debug: false, debugSave: true }).init();
+
 
 // WRITE RENDER FOR TABLE IN DEBUG MODE

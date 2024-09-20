@@ -11,6 +11,7 @@ export class StateEntity {
   static DUMP_CARDS: CardEntity[] = [];
   static TABLE: CardEntity[][] = [];
   static TOTAL_PLAYERS: 2 | 3 | 4 = 2;
+  static LAST_COUNTER_MOVE_PLAYER: PlayerEntity | null = null;
 
   static setToLocalStorage = () => {
     const obj = {};
@@ -43,7 +44,7 @@ export class StateEntity {
 
   static save = (count: number = 1) => {
     if(!(StateEntity.MOVE_COUNT % count)) {
-      console.log('debug saved', StateEntity.MOVE_COUNT, count, StateEntity.MOVE_COUNT % count);
+      console.warn('debug saved', StateEntity.MOVE_COUNT, count, StateEntity.MOVE_COUNT % count);
       StateEntity.setToLocalStorage();
     }
   }

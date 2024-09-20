@@ -86,6 +86,7 @@ export class UIEntity {
       <span class="card__suit">${SUITS_MAP.get(card.suit as any)}</span>
       <span class="card__label">${card.label}</span>
     `;
+
     $el.classList.add(card.suit ?? '');
 
     $el.addEventListener('click', (e: any) => {

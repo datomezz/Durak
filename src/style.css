@@ -152,3 +152,11 @@
 .app-button:active {
   background-color: rgb(173, 18, 101);
 }
+
+#trump {
+  font-size: 4rem;
+}
+
+#trump > .hearts, #trump > .diamonds {
+  color: tomato;
+}

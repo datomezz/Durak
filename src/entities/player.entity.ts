@@ -1,5 +1,6 @@
 import { CardEntity } from "./card.entity";
 import { EventEntity, EVENTS_ENUM } from "./events.entity";
+import { StateEntity } from "./state.entity";
 import { UIEntity } from "./ui.entity";
 
 export class PlayerEntity {
@@ -33,7 +34,13 @@ export class PlayerEntity {
   set isMyTurnToMove(bool: boolean) { 
     this._isMyTurnToMove = bool; 
   }
-  set isMyTurnToCounterMove(bool: boolean) { this._isMyTurnToCounterMove = bool; }
+  set isMyTurnToCounterMove(bool: boolean) { 
+    this._isMyTurnToCounterMove = bool; 
+    if(bool) {
+      StateEntity.LAST_COUNTER_MOVE_PLAYER = this;
+    }
+  }
+
   set isHuman(bool: boolean) { this._isHuman = bool}
   
   public modifyCardsForMoving = (tableCards: CardEntity[][]) => {
