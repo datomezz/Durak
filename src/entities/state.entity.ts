@@ -12,6 +12,7 @@ export class StateEntity {
   static TABLE: CardEntity[][] = [];
   static TOTAL_PLAYERS: 2 | 3 | 4 = 2;
   static LAST_COUNTER_MOVE_PLAYER: PlayerEntity | null = null;
+  static GAME_FINISHED: boolean = false;
 
   static setToLocalStorage = () => {
     const obj = {};

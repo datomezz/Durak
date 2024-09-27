@@ -52,6 +52,7 @@ export class PlayerEntity {
       if(this.isMyTurnToMove) {
         this.myCards.forEach(card => card.isAllowToMove = true);
         UIEntity.updatePlayer(this);
+        this._botMoves();
       }
 
       return;
@@ -82,6 +83,18 @@ export class PlayerEntity {
     }
 
     UIEntity.updatePlayer(this);
+    this._botMoves();
+  }
+
+  private _botMoves = () => {
+    if(!this.isHuman && this.isMyTurnToMove) {
+      this.decideWhatToMove();
+    }
+
+    if(!this.isHuman && this.isMyTurnToCounterMove) {
+      this.decideWhatToMove();
+    }
+
   }
 
   public check = () => { };
@@ -94,10 +107,48 @@ export class PlayerEntity {
     EventEntity.dispatch(EVENTS_ENUM.REMOVE_CARD_FROM_PLAYER, removedCard);
   };
 
+
   public take = (table: CardEntity[][]) => {
     const cards = table.flatMap(i => i);
     this.setCards([...this.myCards, ...cards]);
     this.hasTaken = true;
     UIEntity.updatePlayer(this);
   };
+
+  public decideWhatToMove = () => {
+    if(this.isHuman) return;
+
+    const allowedCards = this.myCards.filter(c => c.isAllowToMove);
+
+    if(!allowedCards.length) {
+      if(this.isMyTurnToCounterMove) {
+        EventEntity.dispatch(EVENTS_ENUM.BOARD_TAKE);
+        return;
+      }
+
+      EventEntity.dispatch(EVENTS_ENUM.BOARD_CHECK);
+      return;
+    }
+
+    const smallestOne = allowedCards
+      .filter(c => !c.isTrump)
+      .filter(c => c.isAllowToMove)
+      .sort((a, b) => a.power - b.power)[0];
+
+    const smallestTrumpOne = allowedCards
+      .filter(c => c.isTrump)
+      .filter(c => c.isAllowToMove)
+      .sort((a, b) => a.power - b.power)[0];
+
+    const selectedCard = smallestOne || smallestTrumpOne;
+
+    if(selectedCard && StateEntity.IS_MOVEMENT_ALLOWED) {
+      const id = selectedCard.id;
+      const $el = document.querySelector(`.card[data-id="${id}"]`) as HTMLElement;
+      requestAnimationFrame(() => {
+        $el.click()
+      });
+    }
+  }
+
 }

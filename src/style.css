@@ -132,6 +132,10 @@
   background-color: rgb(253, 207, 199);
 }
 
+.card[data-is-allow-to-move="true"].card[data-is-trump="true"] {
+  background-color: lightblue;
+}
+
 .button-container {
   display: flex;
   justify-content: center;
