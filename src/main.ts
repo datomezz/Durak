@@ -97,7 +97,7 @@ export class BoardEntity {
 
   private _generateDeck = () => {
     const arr = [];
-    // for(let x = 0; x < 3; x++) {
+    // for(let x = 0; x < 2; x++) {
     for(let x = 0; x < SUITS.length; x++) {
       for(let i = 0; i < DECK_POWERS.length; i++) {
         arr.push(new CardEntity({isTrump: SUITS[x] === this.TRUMP, power: DECK_POWERS[i], suit: SUITS[x]}));
@@ -217,43 +217,51 @@ export class BoardEntity {
     return this.players.findIndex(p => p.id === nextId);
   }
 
-  private _findNextIndex = (currentIdx: number) => {
-    return (currentIdx + 1) % this.players.length;
-  }
-
   public updatePlayersCardsForMoving = () => {
     this.players.forEach(p => p.modifyCardsForMoving(this.table));
   }
 
-  public checkAction = async () => {
-    if(this._isPlayerTaking) {
-      const playersLength = this.players.length == 2 ? 1 : this.players.length - 2;
+  public checkAction = () => {
+    const playersLength = this.players.length == 2 ? 1 : this.players.length - 2;
 
-      if(this._playerCheckingCount === playersLength) {
+    if(this._isPlayerTaking) {
+      if(this._playerCheckingCount === playersLength || this.players.length <= 2) {
         EventEntity.dispatch(EVENTS_ENUM.PLAYER_TOOK);
         this._isPlayerTaking = false;
-        this._playerCheckingCount = 0;
         return;
       }
 
-      const bots = this.players.filter(p => !p.isHuman);
-      const bot = bots[this._findPlayerIdxWhoMoves()];
-
-      if(!bot) {
-        return EventEntity.dispatch(EVENTS_ENUM.BOARD_CHECK);
-      }
-
-      const cards = bot.myCards.filter(c => c.isAllowToMove);
-      for(let i = 0; i < cards.length; i++) {
-        bot.decideWhatToMove();
-      }
 
       this._changeMovingPlayer();
-      // this._playerCheckingCount++;
-      return EventEntity.dispatch(EVENTS_ENUM.BOARD_CHECK);
+
+      // REMOVE THIS FOR ONLINE PLAYING BECAUSE IT GIVES EXTRA INFO
+      const playerHasNoCardsToMove = this.players[this._findPlayerIdxWhoMoves()].myCards.every(c => !c.isAllowToMove);
+      const tableIsFull = this.table.length === ALLOWED_MOVEMENT_COUNT;
+
+      if(playerHasNoCardsToMove || tableIsFull) {
+        EventEntity.dispatch(EVENTS_ENUM.BOARD_CHECK);
+      }
+
+      return;
+    }
+
+    // HAS TO CHECK - [ ]
+    if(this._playerCheckingCount === playersLength ||
+      this.players.length <= 2 || !StateEntity.IS_MOVEMENT_ALLOWED ||
+      !this.players[this._findPlayerIdxWhoCounterMoves()].myCards.length ||
+      this.players[this._findPlayerIdxWhoCounterMoves()].maxCardsLength <= this.table.length
+    ) {
+      EventEntity.dispatch(EVENTS_ENUM.BOARD_DUMP);
+      return;
     }
 
     this._changeMovingPlayer();
+
+    // REMOVE THIS FOR ONLINE PLAYING BECAUSE IT GIVES EXTRA INFO
+    const playerHasNoCardsToMove = this.table.length && this.players[this._findPlayerIdxWhoMoves()].myCards.every(c => !c.isAllowToMove);
+    if(playerHasNoCardsToMove) {
+      EventEntity.dispatch(EVENTS_ENUM.BOARD_CHECK);
+    }
   }
 
   private _changeMovingPlayer = () => {
@@ -269,9 +277,9 @@ export class BoardEntity {
     if(nextPlayerIdx !== -1) {
       this.players[lastMovingPlayer].isMyTurnToMove = false;
       this.players[nextPlayerIdx].isMyTurnToMove = true;
-      // this.updatePlayersCardsForMoving();
+      this.updatePlayersCardsForMoving();
 
-      if(this._isPlayerTaking) this._playerCheckingCount++;
+      this._playerCheckingCount++;
     }
 
   }
@@ -294,7 +302,7 @@ export class BoardEntity {
       const counterIdx = this._findPlayerIdxWhoCounterMoves();
       const filteredTable = this.table.filter(c => c.length === 1);
 
-      if(secondTurn && this.players[playerIdx].myCards.find(c => c.id === +cardId)?.isAllowToMove) return true;
+      if(this.players[counterIdx].maxCardsLength <= this.table.length) return false;
       if(this.players[counterIdx].myCards.length <= filteredTable.length) return false;
       if(this.table.length === ALLOWED_MOVEMENT_COUNT) return false;
       if(!this.players[this._findPlayerIdxWhoCounterMoves()].myCards.length) return false;
@@ -316,7 +324,6 @@ export class BoardEntity {
   }
 
   private _updatePlayersCards = (): void => {
-    // ADD ORDER SORTING, TO START COUNTING FROM PLAYER WHO MOVES FIRST
     let sortedArr = [...this.players.sort((a, b) => Number(b.isMyTurnToMove) - Number(a.isMyTurnToMove))];
 
     sortedArr.forEach(p => {
@@ -365,10 +372,12 @@ export class BoardEntity {
   }
 
   private _updateGame = () => {
+    this._playerCheckingCount = 0;
     this._updatePlayersCards();
     EventEntity.dispatch(EVENTS_ENUM.UPDATE_ALL_CARDS, this.allCards);
     this._recalculateIdxs();
     this.updatePlayersCardsForMoving();
+    console.log('pizdec', this.players.map(p => p.myCards));
 
     if(this.players.length <= 1) {
       return this.finishGame();
@@ -388,11 +397,6 @@ export class BoardEntity {
     alert(`Player NO - ${this.players[0].id} Has Lost`);
   }
 
-  public startGame = () => {
-    const idx = this._findPlayerIdxWhoMoves();
-    this.players[idx].decideWhatToMove();
-  }
-
   public init = () => {
     if(!this.UI) return;
 
@@ -401,7 +405,6 @@ export class BoardEntity {
       this.UI.generateDefaultPlayField(this.players);
       this._renderTrump();
       this._defineWhoMovesFirst();
-      this.startGame();
     }
 
     if(this._debug) {
@@ -411,7 +414,7 @@ export class BoardEntity {
       console.table(this.players);
     }
 
-    // EVENT LISTENERS
+    // GAME EVENTS
     document.addEventListener(EVENTS_ENUM.UPDATE_ALL_CARDS, (e: any) => {
       const cards: CardEntity[] = e.detail;
       const $el = document.querySelector('#allCards');
@@ -460,55 +463,40 @@ export class BoardEntity {
       this._updateGame();
     });
 
-    document.addEventListener(EVENTS_ENUM.BOARD_CHECK, (e: any) => {
-      this.checkAction();
+    document.addEventListener(EVENTS_ENUM.PLAYER_COUNTER_MOVED, (e: any) => {
+      this._playerCheckingCount = 0;
     });
 
-    document.addEventListener(EVENTS_ENUM.TEST, (e: any) => {
+    // BOARD EVENTS
+    document.addEventListener(EVENTS_ENUM.BOARD_CHECK, (e: any) => {
       if(StateEntity.GAME_FINISHED) return;
-      const isHumanMoving = this.players[this._findPlayerIdxWhoMoves()].isHuman;
-      const bots = this.players.filter(p => !p.isHuman)
-
-      if(!this._isPlayerTaking) {
-        this.table.flatMap(i => i).length % 2 === 0 ?
-          bots[this._findPlayerIdxWhoMoves()]?.decideWhatToMove() :
-          bots[this._findPlayerIdxWhoCounterMoves()]?.decideWhatToMove();
-      }
-
-      if(this._isPlayerTaking && !isHumanMoving) {
-      }
-
+      this.checkAction();
     });
 
     document.addEventListener(EVENTS_ENUM.BOARD_TAKE, (e: any) => {
       this._isPlayerTaking = true;
+      this._playerCheckingCount = 0;
     });
+
+    document.addEventListener(EVENTS_ENUM.BOARD_DUMP, (e: any) => {
+      this.dumpAction();
+    })
 
     // BUTTON LISTENERS
     document.querySelector('#check')?.addEventListener('click', () => {
-      if(this._isPlayerTaking) {
-        this._changeMovingPlayer();
-      }
-      this.checkAction();
-      this.updatePlayersCardsForMoving();
+      EventEntity.dispatch(EVENTS_ENUM.BOARD_CHECK);
     });
-
-    document.querySelector('#move')?.addEventListener('click', () => {
-    });
-
 
     document.querySelector('#dump')?.addEventListener('click', () => {
-      this.dumpAction();
+      EventEntity.dispatch(EVENTS_ENUM.BOARD_DUMP);
+    });
+
+    document.querySelector('#take')?.addEventListener('click', () => {
+      EventEntity.dispatch(EVENTS_ENUM.BOARD_TAKE);
     });
 
     document.querySelector('#save')?.addEventListener('click', () => {
       StateEntity.setToLocalStorage();
-    });
-
-    document.querySelector('#take')?.addEventListener('click', () => {
-      this._isPlayerTaking = true;
-      this.checkAction();
-      // EventEntity.dispatch(EVENTS_ENUM.BOARD_MOVE);
     });
 
   }
@@ -517,7 +505,7 @@ export class BoardEntity {
 
 document.addEventListener('DOMContentLoaded', () => {
   const DEBUG = false;
-  const TOTAL_PLAYERS = 3;
+  const TOTAL_PLAYERS = 4;
   DEBUG ? 
     new BoardEntity({ totalPlayers: TOTAL_PLAYERS, debug: true, debugSave: false }).init() 
     :
@@ -526,3 +514,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // WRITE RENDER FOR TABLE IN DEBUG MODE
 // Write Autimatic Taking Logic.
+
+// !!! When I have by default 5 cards,
+// Players are still avalible to move the extra 6th card. Which is
+// bug. The maximum amount should be based on players initial card's
+// length. !!!

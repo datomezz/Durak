@@ -82,6 +82,14 @@
   gap: .5rem;
 }
 
+.cards--counter-active {
+  background-color: #c8c8c8;
+}
+
+.cards--move-active {
+  background-color: #fbb6b6;
+}
+
 .card {
   width: var(--cardWidth);
   height: var(--cardHeigth);

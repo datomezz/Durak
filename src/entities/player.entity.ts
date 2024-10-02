@@ -1,3 +1,4 @@
+import { ALLOWED_MOVEMENT_COUNT } from "../index.constants";
 import { CardEntity } from "./card.entity";
 import { EventEntity, EVENTS_ENUM } from "./events.entity";
 import { StateEntity } from "./state.entity";
@@ -6,7 +7,7 @@ import { UIEntity } from "./ui.entity";
 export class PlayerEntity {
   static PLAYER_COUNT = 1;
 
-  constructor() { 
+  constructor() {
     this.id = PlayerEntity.PLAYER_COUNT++;
   }
 
@@ -14,6 +15,7 @@ export class PlayerEntity {
   public myCards: CardEntity[] = [];
   public hasTaken: boolean = false;
   public hasFinished: boolean = false;
+  public maxCardsLength: number = ALLOWED_MOVEMENT_COUNT;
 
   public setCards = (cards: CardEntity[]) => {
     this.myCards = cards;
@@ -34,9 +36,13 @@ export class PlayerEntity {
   set isMyTurnToMove(bool: boolean) { 
     this._isMyTurnToMove = bool; 
   }
+
   set isMyTurnToCounterMove(bool: boolean) { 
     this._isMyTurnToCounterMove = bool; 
+    this.maxCardsLength = ALLOWED_MOVEMENT_COUNT;
+
     if(bool) {
+      this.maxCardsLength = this.myCards.length;
       StateEntity.LAST_COUNTER_MOVE_PLAYER = this;
     }
   }
@@ -52,7 +58,6 @@ export class PlayerEntity {
       if(this.isMyTurnToMove) {
         this.myCards.forEach(card => card.isAllowToMove = true);
         UIEntity.updatePlayer(this);
-        this._botMoves();
       }
 
       return;
@@ -83,21 +88,7 @@ export class PlayerEntity {
     }
 
     UIEntity.updatePlayer(this);
-    this._botMoves();
   }
-
-  private _botMoves = () => {
-    if(!this.isHuman && this.isMyTurnToMove) {
-      this.decideWhatToMove();
-    }
-
-    if(!this.isHuman && this.isMyTurnToCounterMove) {
-      this.decideWhatToMove();
-    }
-
-  }
-
-  public check = () => { };
 
   public move = (target: HTMLDivElement) => {
     const targetId = target.dataset.id as any;
@@ -105,6 +96,10 @@ export class PlayerEntity {
     const removedCard = this.myCards.splice(removeIdx, 1);
     UIEntity.removeCard(targetId);
     EventEntity.dispatch(EVENTS_ENUM.REMOVE_CARD_FROM_PLAYER, removedCard);
+
+    if(this.isMyTurnToCounterMove) {
+      EventEntity.dispatch(EVENTS_ENUM.PLAYER_COUNTER_MOVED, this);
+    }
   };
 
 
@@ -114,41 +109,4 @@ export class PlayerEntity {
     this.hasTaken = true;
     UIEntity.updatePlayer(this);
   };
-
-  public decideWhatToMove = () => {
-    if(this.isHuman) return;
-
-    const allowedCards = this.myCards.filter(c => c.isAllowToMove);
-
-    if(!allowedCards.length) {
-      if(this.isMyTurnToCounterMove) {
-        EventEntity.dispatch(EVENTS_ENUM.BOARD_TAKE);
-        return;
-      }
-
-      EventEntity.dispatch(EVENTS_ENUM.BOARD_CHECK);
-      return;
-    }
-
-    const smallestOne = allowedCards
-      .filter(c => !c.isTrump)
-      .filter(c => c.isAllowToMove)
-      .sort((a, b) => a.power - b.power)[0];
-
-    const smallestTrumpOne = allowedCards
-      .filter(c => c.isTrump)
-      .filter(c => c.isAllowToMove)
-      .sort((a, b) => a.power - b.power)[0];
-
-    const selectedCard = smallestOne || smallestTrumpOne;
-
-    if(selectedCard && StateEntity.IS_MOVEMENT_ALLOWED) {
-      const id = selectedCard.id;
-      const $el = document.querySelector(`.card[data-id="${id}"]`) as HTMLElement;
-      requestAnimationFrame(() => {
-        $el.click()
-      });
-    }
-  }
-
 }

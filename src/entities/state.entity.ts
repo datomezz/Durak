@@ -32,7 +32,9 @@ export class StateEntity {
     for(let [key, value] of Object.entries(obj)) {
       switch(key) {
         case 'PLAYERS':
-          value = (value as PlayerEntity[]).map(p => Object.assign(new PlayerEntity(), p));
+          value = (value as PlayerEntity[]).map(p => {
+            return Object.defineProperties( new PlayerEntity(), Object.getOwnPropertyDescriptors(p));
+          });
           //@ts-ignore
           StateEntity[key] = value;
           break;

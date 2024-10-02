@@ -81,6 +81,8 @@ export class UIEntity {
       $el.dataset[key] = value;
     }
 
+    $el.dataset.isAllowToMove = '' + card.isAllowToMove;
+
     $el.innerHTML = `
       <span class="card__label">${card.label}</span>
       <span class="card__suit">${SUITS_MAP.get(card.suit as any)}</span>
@@ -101,7 +103,7 @@ export class UIEntity {
     if(!table) return;
     $table.innerHTML = '';
     table.forEach(cards => {
-      $table?.appendChild(UIEntity.createTableItem(cards));
+      $table?.append(UIEntity.createTableItem(cards));
     })
   }
 
@@ -109,8 +111,16 @@ export class UIEntity {
     const selector = HTML_SELECTOR_MAP.get(ELEMENT_ENUM.PLAYERS_CARDS) + `[data-id="${player.id}"]`;
     const $player = document.querySelector(selector);
     if(!$player) return;
+    document.querySelectorAll(HTML_SELECTOR_MAP.get(ELEMENT_ENUM.PLAYERS_CARDS)).forEach(i => i.classList.remove('cards--move-active'));
+    document.querySelectorAll(HTML_SELECTOR_MAP.get(ELEMENT_ENUM.PLAYERS_CARDS)).forEach(i => i.classList.remove('cards--counter-active'));
     $player.innerHTML = '';
-    player.myCards.forEach(card => $player?.appendChild(UIEntity.createCard(card)));
+    player.myCards.forEach(card => $player?.append(UIEntity.createCard(card)));
+    if(player.isMyTurnToMove || player.isMyTurnToCounterMove) {
+      requestAnimationFrame(() => {
+        if(player.isMyTurnToMove) $player.classList.add('cards--move-active');
+        if(player.isMyTurnToCounterMove) $player.classList.add('cards--counter-active');
+      })
+    }
   }
 
   static removeCard = (cardId: string) => {
