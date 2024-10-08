@@ -6,6 +6,7 @@ import { EventEntity, EVENTS_ENUM } from './entities/events.entity';
 import { StateEntity } from './entities/state.entity';
 
 import './style.css'
+import { BotEntity } from './entities/bot.entity';
 
 export interface IBoardEntityConstructor {
   totalPlayers: 2 | 3 | 4,
@@ -278,6 +279,7 @@ export class BoardEntity {
       this.players[lastMovingPlayer].isMyTurnToMove = false;
       this.players[nextPlayerIdx].isMyTurnToMove = true;
       this.updatePlayersCardsForMoving();
+      EventEntity.dispatch(EVENTS_ENUM.PLAYER_SWITCHED);
 
       this._playerCheckingCount++;
     }
@@ -377,7 +379,6 @@ export class BoardEntity {
     EventEntity.dispatch(EVENTS_ENUM.UPDATE_ALL_CARDS, this.allCards);
     this._recalculateIdxs();
     this.updatePlayersCardsForMoving();
-    console.log('pizdec', this.players.map(p => p.myCards));
 
     if(this.players.length <= 1) {
       return this.finishGame();
@@ -396,6 +397,8 @@ export class BoardEntity {
 
     alert(`Player NO - ${this.players[0].id} Has Lost`);
   }
+
+  private _bot = new BotEntity();
 
   public init = () => {
     if(!this.UI) return;
@@ -441,6 +444,7 @@ export class BoardEntity {
       const cards: CardEntity[][] = e.detail;
       UIEntity.updateTable(cards);
       StateEntity.MOVE_COUNT++;
+      EventEntity.dispatch(EVENTS_ENUM.PLAYER_SWITCHED);
       if(this._debugSave) {
         StateEntity.save(3);
       }
@@ -466,6 +470,10 @@ export class BoardEntity {
     document.addEventListener(EVENTS_ENUM.PLAYER_COUNTER_MOVED, (e: any) => {
       this._playerCheckingCount = 0;
     });
+
+    document.addEventListener(EVENTS_ENUM.PLAYER_SWITCHED, (e) => {
+      this._bot.define(this.players, this.table);
+    })
 
     // BOARD EVENTS
     document.addEventListener(EVENTS_ENUM.BOARD_CHECK, (e: any) => {
