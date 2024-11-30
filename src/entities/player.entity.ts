@@ -16,6 +16,7 @@ export class PlayerEntity {
   public hasTaken: boolean = false;
   public hasFinished: boolean = false;
   public maxCardsLength: number = ALLOWED_MOVEMENT_COUNT;
+  public isTaking: boolean = false;
 
   public setCards = (cards: CardEntity[]) => {
     this.myCards = cards;

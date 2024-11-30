@@ -400,23 +400,7 @@ export class BoardEntity {
 
   private _bot = new BotEntity();
 
-  public init = () => {
-    if(!this.UI) return;
-
-    if(!this._debug) {
-      this._generateDeck();
-      this.UI.generateDefaultPlayField(this.players);
-      this._renderTrump();
-      this._defineWhoMovesFirst();
-    }
-
-    if(this._debug) {
-      this.UI.generateDefaultPlayFieldDebug(this.players, this.table);
-      this._renderTrump();
-      this.updatePlayersCardsForMoving();
-      console.table(this.players);
-    }
-
+  private _loadGameEvents = () => {
     // GAME EVENTS
     document.addEventListener(EVENTS_ENUM.UPDATE_ALL_CARDS, (e: any) => {
       const cards: CardEntity[] = e.detail;
@@ -456,13 +440,17 @@ export class BoardEntity {
     });
 
     document.addEventListener(EVENTS_ENUM.GAME_UPDATED, (e: any) => {
-      this.players.forEach(p => p.hasTaken = false);
+      this.players.forEach(p => {
+        p.hasTaken = false
+        p.isTaking = false;
+      });
     });
 
     document.addEventListener(EVENTS_ENUM.PLAYER_TOOK, (e: any) => {
       const idx = this._findPlayerIdxWhoCounterMoves();
       this.players[idx].take(this.table);
       this.table = [];
+      this._bot.resetTaking();
       UIEntity.updateTable(this.table);
       this._updateGame();
     });
@@ -484,12 +472,15 @@ export class BoardEntity {
     document.addEventListener(EVENTS_ENUM.BOARD_TAKE, (e: any) => {
       this._isPlayerTaking = true;
       this._playerCheckingCount = 0;
+      this.players[this._findPlayerIdxWhoCounterMoves()].isTaking = true;
     });
 
     document.addEventListener(EVENTS_ENUM.BOARD_DUMP, (e: any) => {
       this.dumpAction();
     })
+  }
 
+  private _loadClientEvents = () => {
     // BUTTON LISTENERS
     document.querySelector('#check')?.addEventListener('click', () => {
       EventEntity.dispatch(EVENTS_ENUM.BOARD_CHECK);
@@ -506,6 +497,30 @@ export class BoardEntity {
     document.querySelector('#save')?.addEventListener('click', () => {
       StateEntity.setToLocalStorage();
     });
+
+  }
+
+  public init = () => {
+    if(!this.UI) return;
+    this._loadGameEvents();
+    this._loadClientEvents();
+
+    if(!this._debug) {
+      this._generateDeck();
+      this.UI.generateDefaultPlayField(this.players);
+      this._renderTrump();
+      this._defineWhoMovesFirst();
+      if(this._bot) {
+        this._bot.firstMove(this.players, this.table);
+      }
+    }
+
+    if(this._debug) {
+      this.UI.generateDefaultPlayFieldDebug(this.players, this.table);
+      this._renderTrump();
+      this.updatePlayersCardsForMoving();
+      console.table(this.players);
+    }
 
   }
 
